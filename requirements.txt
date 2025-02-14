@@ -1,0 +1,5 @@
+psutil
+watchdog
+pathlib
+python-vlc
+mutagen
