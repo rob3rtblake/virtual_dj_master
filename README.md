@@ -1,22 +1,26 @@
 # Virtual DJ System
 
-A complete streaming solution that integrates audio streaming through Virtual Cable, video streaming through Virtual Camera, and OBS integration with now playing display.
+Automated music streaming system with OBS integration and watchdog monitoring.
+
+## Features
+- Automatic playlist generation and management
+- OBS integration with Now Playing display
+- Watchdog monitoring for stability
+- Virtual audio device support
+- Automatic crash recovery
 
 ## Quick Start
 1. Run `setup.bat` to install dependencies
-2. Place audio files in `AudioSource` folder
-3. Place video files in `D:\Projects\99_Export\02_Video\01_Horizontal`
-4. Run `start_all.bat` to begin streaming
+2. Add music to `AudioSource` folder
+3. Configure `config.json` with your settings
+4. Run `start_stream.bat` to begin
 
 ## Requirements
 - Python 3.9+
-- FFmpeg (latest full build)
+- FFmpeg (latest)
 - VB-Audio Virtual Cable
-- OBS Studio
-- Python packages:
-  ```bash
-  pip install psutil
-  ```
+- OBS Studio 29+
+- Windows 10/11
 
 ## Installation Guide
 
@@ -90,26 +94,54 @@ A complete streaming solution that integrates audio streaming through Virtual Ca
 2. Open OBS Studio
 3. In OBS audio settings, you should see "CABLE Output" as an audio source
 
-## System Overview
-The Virtual DJ system is a Python-based streaming solution that handles audio playback through virtual audio devices while maintaining song metadata and playlist management.
+## Directory Structure
+```
+virtual_dj_master/
+├── AudioSource/       # Music library
+├── logs/             # Application logs
+├── config.json       # Configuration
+├── setup.bat         # Installation script
+├── start_stream.bat  # Launch script
+├── cleanup.bat       # Process cleanup
+└── *.py             # Python source files
+```
 
-### Directory Structure
-
-## Components
-- `virtual_dj.py`: Main audio streaming system
-- `video_compliment.py`: Video streaming system
-- `now_playing.py`: Display current track in OBS
-
-## Audio Sources
-The system looks for audio files in these locations:
-1. `AudioSource` folder (local to the application)
-2. `C:\Users\rob3r\OneDrive\Documents\Soulseek Downloads\complete`
-
-You can add or modify source locations in `config.json`.
+## Configuration
+Edit `config.json` to customize:
+```json
+{
+    "audio_sources": ["AudioSource"],
+    "obs": {
+        "scene_name": "Your Scene Name",
+        "profile_name": "Your Profile"
+    },
+    "watchdog": {
+        "timeout_seconds": 10,
+        "max_skips": 3
+    }
+}
+```
 
 ## Troubleshooting
-If streams don't start:
-1. Check if VB-Audio Cable is set as default recording device
-2. Verify FFmpeg is in system PATH
-3. Run cleanup.bat and try again
-4. Check OBS audio source settings
+1. Audio issues:
+   - Verify Virtual Cable installation
+   - Check Windows audio settings
+   - Run cleanup.bat before restart
+
+2. OBS issues:
+   - Check OBS installation path
+   - Verify scene and profile names
+   - Enable WebSocket server
+
+3. Playback issues:
+   - Check file permissions
+   - Verify audio file formats
+   - Check log files in logs/
+
+## Support
+- Report issues on GitHub
+- Check DOCUMENTATION.md for technical details
+- Run setup.bat for dependency verification
+
+## License
+GNU General Public License v3.0

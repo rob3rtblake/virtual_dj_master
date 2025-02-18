@@ -166,4 +166,23 @@ cython_debug/
 now_playing.txt
 now_playing.txt
 Playlist.m3u
-Playlist.m3u
+
+# Virtual Environment
+venv/
+env/
+
+# Logs and temp files
+logs/
+*.tmp
+
+# Audio files
+AudioSource/**/*.mp3
+AudioSource/**/*.wav
+AudioSource/**/*.flac
+
+# Config
+config.local.json
+
+# IDE
+.vscode/
+.idea/

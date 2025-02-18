@@ -148,13 +148,11 @@ def check_audio_device():
         return False
 
 def start_stream(playlist_file):
-    """Simplified streaming command focusing on audio quality"""
+    """Start audio stream with basic settings"""
     if not check_audio_device():
         return False, False
 
-    device_name = audio_devices.get_device()
-    
-    # Single, optimized FFmpeg command
+    # Use simple, working FFmpeg command
     command = [
         FFMPEG_PATH,
         '-hide_banner',
@@ -165,9 +163,9 @@ def start_stream(playlist_file):
         '-i', playlist_file,
         '-ac', '2',           # Force stereo
         '-ar', '44100',       # Standard sample rate
-        '-acodec', 'pcm_s16le',  # High quality PCM
+        '-acodec', 'pcm_s16le',
         '-af', 'aresample=async=1000',  # Handle async audio
-        '-buffer_size', '1024',  # Stable buffer
+        '-buffer_size', '1024',
         '-f', 'wav',
         '-'
     ]
@@ -180,14 +178,13 @@ def start_stream(playlist_file):
             creationflags=subprocess.CREATE_NO_WINDOW
         )
         
-        # Pipe to ffplay with optimized settings
+        # Pipe to ffplay
         ffplay_cmd = [
             os.path.join(os.path.dirname(FFMPEG_PATH), 'ffplay'),
             '-f', 'wav',
             '-nodisp',
             '-autoexit',
             '-loglevel', 'quiet',
-            '-af', 'volume=1.0',  # Normalize volume
             '-'
         ]
         
