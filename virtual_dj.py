@@ -14,7 +14,6 @@ LOG_FILE = "played_songs.log"
 VIRTUAL_CABLE_NAME = "CABLE Input (VB-Audio Virtual Cable)"
 OBS_PATH = r"C:\Program Files\obs-studio\bin\64bit\obs64.exe"
 FFMPEG_PATH = r"C:\Program Files\FFMPEG\ffmpeg-2025-02-13-git-19a2d26177-full_build\bin\ffmpeg.exe"
-PYTHON_PATH = r"C:\Program Files (x86)\Microsoft Visual Studio\Shared\Python39_64\python.exe"
 VIRTUAL_CABLE_VARIANTS = [
     "CABLE Input (VB-Audio Virtual Cable)",
     "CABLE Input",
@@ -151,7 +150,7 @@ def check_audio_device():
 def start_stream(playlist_file):
     """Simplified streaming command focusing on audio quality"""
     if not check_audio_device():
-        return False
+        return False, False
 
     device_name = audio_devices.get_device()
     
@@ -159,7 +158,8 @@ def start_stream(playlist_file):
     command = [
         FFMPEG_PATH,
         '-hide_banner',
-        '-loglevel', 'info',
+        '-loglevel', 'debug',
+        '-stream_loop', '-1',
         '-f', 'concat',
         '-safe', '0',
         '-i', playlist_file,
@@ -173,7 +173,7 @@ def start_stream(playlist_file):
     ]
 
     try:
-        process = subprocess.Popen(
+        ffmpeg_process = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -193,16 +193,15 @@ def start_stream(playlist_file):
         
         ffplay_process = subprocess.Popen(
             ffplay_cmd,
-            stdin=process.stdout,
+            stdin=ffmpeg_process.stdout,
             creationflags=subprocess.CREATE_NO_WINDOW
         )
         
-        process.stdout.close()
-        return ffplay_process
+        return ffmpeg_process, ffplay_process
         
     except Exception as e:
         print(f"Error starting stream: {e}")
-        return False
+        return False, False
 
 def kill_existing_processes():
     """Kill any existing FFmpeg or OBS processes"""
@@ -226,29 +225,36 @@ def kill_existing_processes():
         time.sleep(2)
 
 def check_audio_files():
-    """Check for audio files recursively"""
-    if not os.path.exists(AUDIO_SOURCE):
-        os.makedirs(AUDIO_SOURCE)
-        print(f"\nCreated '{AUDIO_SOURCE}' folder.")
-        print("Please add audio files and restart.")
-        return False
-
-    # Recursive search for audio files
+    """Check for audio files recursively in all configured locations"""
+    with open('config.json', 'r') as f:
+        config = json.load(f)
+    
+    audio_sources = config['audio_sources']
     audio_files = []
+    
     print("\nScanning for audio files...")
-    for root, _, files in os.walk(AUDIO_SOURCE):
-        for file in files:
-            if file.lower().endswith(('.mp3', '.wav')):
-                audio_files.append(os.path.join(root, file))
+    for source in audio_sources:
+        if not os.path.exists(source):
+            print(f"\nWarning: Source folder not found: {source}")
+            continue
+            
+        print(f"\nScanning: {source}")
+        for root, _, files in os.walk(source):
+            for file in files:
+                if file.lower().endswith(('.mp3', '.wav', '.flac')):
+                    audio_files.append(os.path.join(root, file))
 
     if not audio_files:
-        print(f"\n[ERROR] No audio files found in {AUDIO_SOURCE} or its subfolders")
+        print(f"\n[ERROR] No audio files found in any source folders:")
+        for source in audio_sources:
+            print(f"- {source}")
         print("\nPlease add supported audio files:")
         print("- MP3 files (*.mp3)")
         print("- WAV files (*.wav)")
+        print("- FLAC files (*.flac)")
         return False
 
-    print(f"\nFound {len(audio_files)} audio files")
+    print(f"\nFound {len(audio_files)} audio files total")
     return True
 
 class CurrentSong:
@@ -305,61 +311,44 @@ class VirtualDJ:
         self.running = True
         self.playlist_update_interval = 10800  # 3 hours in seconds
         self.current_song = CurrentSong()
+        self.last_status_update = 0
+        self.status_update_interval = 1  # Update every second
+        self.songs_in_playlist = 0
+        self.songs_played = 0
+
+        # Load configuration
+        with open('config.json', 'r') as f:
+            self.config = json.load(f)
 
     def _generate_playlist(self):
         """Create shuffled playlist with recursive folder support"""
         try:
-            # Load played songs log
-            try:
-                with open(LOG_FILE, "r", encoding='utf-8') as f:
-                    played_songs = set(json.load(f))
-            except (FileNotFoundError, json.JSONDecodeError):
-                played_songs = set()
-
-            # Recursive search for audio files with debug output
+            # Recursive search for audio files
             all_songs = []
-            for root, dirs, files in os.walk(AUDIO_SOURCE):
-                for file in files:
-                    if file.lower().endswith(('.mp3', '.wav')):
-                        full_path = os.path.abspath(os.path.join(root, file))
-                        # Extract artist and song from folder structure
-                        try:
-                            # Path format: AudioSource/Artist/Album/XX - Title.mp3
-                            parts = os.path.relpath(full_path, AUDIO_SOURCE).split(os.sep)
-                            artist = parts[0]
-                            title = os.path.splitext(parts[-1])[0]
-                            print(f"Found: {artist} - {title}")
-                            all_songs.append(full_path)
-                        except:
-                            print(f"Found: {file}")
+            for source in self.config['audio_sources']:
+                for root, _, files in os.walk(source):
+                    for file in files:
+                        if file.lower().endswith(('.mp3', '.wav', '.flac')):
+                            full_path = os.path.abspath(os.path.join(root, file))
                             all_songs.append(full_path)
 
             if not all_songs:
-                raise Exception("No audio files found in source directory or its subfolders")
+                raise Exception("No audio files found in source directories")
 
-            print(f"\nFound {len(all_songs)} audio files")
-
-            # Filter unplayed songs
-            unplayed = [s for s in all_songs if s not in played_songs]
-            if not unplayed:
-                print("All songs have been played, starting fresh cycle")
-                played_songs.clear()
-                unplayed = all_songs
+            print(f"\nFound {len(all_songs)} total audio files")
 
             # Create shuffled playlist
-            random.shuffle(unplayed)
+            random.shuffle(all_songs)
+            self.songs_in_playlist = len(all_songs)
+            self.songs_played = 0
 
-            # Write playlist with proper escaping
+            # Write playlist
             with open(PLAYLIST_FILE, "w", encoding='utf-8') as f:
-                for song in unplayed:
+                for song in all_songs:
                     escaped_path = song.replace("'", "'\\''")
                     f.write(f"file '{escaped_path}'\n")
 
-            # Update played songs log
-            played_songs.update(unplayed)
-            with open(LOG_FILE, "w", encoding='utf-8') as f:
-                json.dump(list(played_songs), f, ensure_ascii=False)
-
+            print(f"Created new playlist with {self.songs_in_playlist} songs")
             return True
 
         except Exception as e:
@@ -457,12 +446,9 @@ class VirtualDJ:
             return False
 
     def _playlist_updater(self):
-        """Update playlist every 3 hours"""
+        """Removed automatic playlist updates since we now update after all songs are played"""
         while self.running:
-            time.sleep(self.playlist_update_interval)
-            print("\nUpdating playlist...")
-            self._generate_playlist()
-            self._start_ffmpeg()
+            time.sleep(60)  # Just keep thread alive with minimal overhead
 
     def _watchdog(self):
         """Monitor and restart failed processes with improved retry logic"""
@@ -497,18 +483,12 @@ class VirtualDJ:
 
     def _update_status_file(self):
         """Write current status to file"""
-        status = {
-            "Status": "Playing" if self.ffmpeg_process and self.ffmpeg_process.poll() is None else "Stopped",
-            "Title": self.current_song.title,
-            "Artist": self.current_song.artist,
-            "Album": self.current_song.album,
-            "Time": self.current_song.get_status(),
-            "Last Updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        
-        with open("now_playing.txt", "w", encoding='utf-8') as f:
-            for key, value in status.items():
-                f.write(f"{key}: {value}\n")
+        try:
+            with open("now_playing.txt", "w", encoding='utf-8') as f:
+                f.write(f"{self.current_song.title}\n")
+                f.write(f"{self.current_song.artist} // {self.current_song.album}\n")
+        except Exception as e:
+            print(f"Error writing status: {e}")
 
     def monitor_ffmpeg_output(self, process):
         """Monitor FFmpeg output for song changes"""
@@ -518,19 +498,33 @@ class VirtualDJ:
                 if not line:
                     continue
                     
+                # Detect song changes
                 if "Opening '" in line:
                     file_path = line.split("'")[1]
-                    if file_path.endswith(('.mp3', '.wav')):
+                    if file_path.endswith(('.mp3', '.wav', '.flac')):
+                        self.songs_played += 1
                         if self.current_song.update(file_path):
                             print(f"\nNow Playing: {self.current_song.get_status()}")
+                            print(f"Progress: {self.songs_played}/{self.songs_in_playlist} songs played")
                             self._update_status_file()
+                            
+                            # Check if all songs have been played
+                            if self.songs_played >= self.songs_in_playlist:
+                                print("\n=== All songs have been played! Generating new playlist... ===")
+                                self._generate_playlist()
+                                self._start_ffmpeg()
                 
-                if "size=" in line:  # Regular progress update
-                    print(f"\r{self.current_song.get_status()}", end='', flush=True)
-                    self._update_status_file()
+                # Regular status updates
+                current_time = time.time()
+                if current_time - self.last_status_update >= self.status_update_interval:
+                    if "size=" in line:  # Progress indicator
+                        print(f"\r{self.current_song.get_status()} ({self.songs_played}/{self.songs_in_playlist})", end='', flush=True)
+                        self._update_status_file()
+                        self.last_status_update = current_time
                     
         except Exception as e:
             print(f"Monitor error: {e}")
+            self._update_status_file()
 
     def run(self):
         """Ensure clean startup"""
@@ -543,7 +537,6 @@ class VirtualDJ:
         if not check_audio_files():
             sys.exit(1)
 
-        # Remove redundant checks since check_audio_files handles everything
         print("\n=== Starting Virtual DJ ===")
         print("1. Starting OBS...")
         
@@ -551,11 +544,11 @@ class VirtualDJ:
         for attempt in range(3):
             if attempt > 0:
                 print(f"\nRetrying OBS startup (attempt {attempt + 1}/3)...")
-                time.sleep(5)  # Wait between attempts
+                time.sleep(5)
                 
             if self._start_obs():
                 print("2. Waiting for OBS to initialize...")
-                time.sleep(15)  # Give OBS more time to fully initialize
+                time.sleep(15)
                 break
         else:
             print("[X] Failed to start OBS after 3 attempts")
@@ -567,14 +560,21 @@ class VirtualDJ:
             sys.exit(1)
         
         print("4. Starting FFmpeg stream...")
-        if not self._start_ffmpeg():
+        ffmpeg_process, ffplay_process = start_stream(PLAYLIST_FILE)
+        if not ffmpeg_process or not ffplay_process:
             print("Failed to start FFmpeg")
             sys.exit(1)
-
+        
+        self.ffmpeg_process = ffplay_process  # Store ffplay process for watchdog
         print("\n[OK] All systems running!")
         
+        # Start monitoring threads
         Thread(target=self._playlist_updater, daemon=True).start()
         Thread(target=self._watchdog, daemon=True).start()
+        Thread(target=lambda: self.monitor_ffmpeg_output(ffmpeg_process), daemon=True).start()
+
+        # Write initial status
+        self._update_status_file()
 
         try:
             while True:
@@ -582,10 +582,10 @@ class VirtualDJ:
         except KeyboardInterrupt:
             print("\nShutting down...")
             self.running = False
-            if self.ffmpeg_process:
-                self.ffmpeg_process.terminate()
-            if self.obs_process:
-                self.obs_process.terminate()
+            if ffmpeg_process:
+                ffmpeg_process.terminate()
+            if ffplay_process:
+                ffplay_process.terminate()
             print("Stream stopped.")
 
 if __name__ == "__main__":
