@@ -186,3 +186,6 @@ config.local.json
 # IDE
 .vscode/
 .idea/
+Playlist.m3u
+now_playing.txt
+config.json

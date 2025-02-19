@@ -3,7 +3,7 @@
         "AudioSource",
         "C:\\Users\\rob3r\\OneDrive\\Documents\\Soulseek Downloads\\complete"
     ],
-    "ffmpeg_path": "C:\\Program Files\\FFMPEG\\ffmpeg-2025-02-13-git-19a2d26177-full_build\\bin\\ffmpeg.exe",
+    "ffmpeg_path": "C:\\Windows\\System32\\ffmpeg\\bin\\ffmpeg.exe",
     "virtual_cable_name": "CABLE Input (VB-Audio Virtual Cable)",
     "obs": {
         "scene_name": "Music Scene",

@@ -13,7 +13,7 @@ PLAYLIST_FILE = "Playlist.m3u"
 LOG_FILE = "played_songs.log"
 VIRTUAL_CABLE_NAME = "CABLE Input (VB-Audio Virtual Cable)"
 OBS_PATH = r"C:\Program Files\obs-studio\bin\64bit\obs64.exe"
-FFMPEG_PATH = r"C:\Program Files\FFMPEG\ffmpeg-2025-02-13-git-19a2d26177-full_build\bin\ffmpeg.exe"
+FFMPEG_PATH = r"C:\Windows\System32\ffmpeg\bin\ffmpeg.exe"
 VIRTUAL_CABLE_VARIANTS = [
     "CABLE Input (VB-Audio Virtual Cable)",
     "CABLE Input",
